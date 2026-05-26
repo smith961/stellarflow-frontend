@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, memo } from "react";
 import { RefreshCw } from "lucide-react";
 import { useProgressBar } from "./TopLoadingBar";
 import { useDebounce } from "../hooks/useDebounce";
@@ -97,7 +97,7 @@ const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterInput, setFilterInput] = useState("");
-  const debouncedFilter = useDebounce(filterInput, 300);
+  const debouncedFilter = useDebounce(filterInput, 250);
   const { start, done } = useProgressBar();
 
   // WebSocket hook for delta updates
@@ -346,4 +346,4 @@ const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
   );
 };
 
-export default PriceFeedCard;
+export default memo(PriceFeedCard);

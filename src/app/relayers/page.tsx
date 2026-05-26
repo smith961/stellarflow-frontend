@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import { 
   Activity, 
   Plus, 
@@ -32,6 +33,13 @@ const MOCK_RELAYERS: Relayer[] = [
 
 export default function RelayersPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 250);
+
+  const displayedRelayers = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return MOCK_RELAYERS;
+    return MOCK_RELAYERS.filter(r => r.name.toLowerCase().includes(q) || r.address.toLowerCase().includes(q));
+  }, [debouncedSearch]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-8">
@@ -86,7 +94,7 @@ export default function RelayersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {MOCK_RELAYERS.map((relayer) => (
+              {displayedRelayers.map((relayer) => (
                 <tr key={relayer.id} className="hover:bg-[#1c2128] transition-colors group">
                   <td className="px-6 py-4">
                     <div className="font-medium text-blue-400">{relayer.name}</div>
