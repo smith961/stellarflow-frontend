@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import { useProgressBar } from "./TopLoadingBar";
 import { useDebounce } from "../hooks/useDebounce";
-import { useSocket } from "../hooks/useSocket";
+import { useSocketConnection, useSocketData } from "./providers/SocketProvider";
 import { Shimmer } from "@/components/skeletons/Shimmer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -88,7 +88,6 @@ function formatTime(iso: string): string {
 
 const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
   refreshInterval = 30_000,
-  assetId = "NGN-XLM",
   enableWebSocket = true,
 }) => {
   const [data, setData] = useState<PriceFeedData | null>(null);
@@ -100,17 +99,10 @@ const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
   const debouncedFilter = useDebounce(filterInput, 300);
   const { start, done } = useProgressBar();
 
-  // WebSocket hook for delta updates
-  const {
-    isConnected,
-    lastUpdate: wsUpdate,
-    error: wsError,
-    subscribeToAsset,
-    unsubscribeFromAsset,
-  } = useSocket({
-    assetIds: enableWebSocket ? [assetId] : [],
-    enableDeltaUpdates: true,
-  });
+  // Granular context subscriptions — each hook only re-renders this component
+  // when its specific slice changes, not on every unrelated socket event.
+  const { isConnected, error: wsError } = useSocketConnection();
+  const { lastUpdate: wsUpdate } = useSocketData();
 
   const load = useCallback(async (manual = false) => {
     if (manual) {
@@ -132,29 +124,38 @@ const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
     }
   }, [start, done]);
 
-  // Handle WebSocket delta updates
+  // Merge WebSocket delta updates into local state.
+  // Using a functional setData updater means we read `prev` (current state)
+  // instead of closing over `data` — so `data` is NOT a dependency and the
+  // effect does not re-run after every state write, breaking the render cycle.
   useEffect(() => {
-    if (wsUpdate && enableWebSocket) {
-      // Convert WebSocket update to PriceFeedData format
-      const updatedData: PriceFeedData = {
-        price: wsUpdate.price || data?.price || 0,
-        change_24h: wsUpdate.price ? 0 : (data?.change_24h || 0), // Reset 24h change on new price
-        high_24h: wsUpdate.price ? Math.max(wsUpdate.price, data?.high_24h || 0) : (data?.high_24h || 0),
-        low_24h: wsUpdate.price ? Math.min(wsUpdate.price, data?.low_24h || Infinity) : (data?.low_24h || 0),
-        volume_24h: data?.volume_24h || 0, // Preserve volume from API
-        last_updated: wsUpdate.timestamp ? new Date(wsUpdate.timestamp).toISOString() : (data?.last_updated || new Date().toISOString()),
-      };
-      
-      setData(updatedData);
-      setLastRefresh(new Date());
-      setLoading(false);
-      setError(null);
-    }
-  }, [wsUpdate, data, enableWebSocket]);
+    if (!wsUpdate || !enableWebSocket) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData((prev: PriceFeedData | null) => ({
+      price: wsUpdate.price || prev?.price || 0,
+      // Reset 24 h change indicator when a fresh price arrives.
+      change_24h: wsUpdate.price ? 0 : (prev?.change_24h || 0),
+      high_24h: wsUpdate.price
+        ? Math.max(wsUpdate.price, prev?.high_24h || 0)
+        : (prev?.high_24h || 0),
+      low_24h: wsUpdate.price
+        ? Math.min(wsUpdate.price, prev?.low_24h || Infinity)
+        : (prev?.low_24h || 0),
+      volume_24h: prev?.volume_24h || 0, // volume comes from REST, not WS
+      last_updated: wsUpdate.timestamp
+        ? new Date(wsUpdate.timestamp).toISOString()
+        : (prev?.last_updated || new Date().toISOString()),
+    }));
+    setLastRefresh(new Date());
+    setLoading(false);
+    setError(null);
+  }, [wsUpdate, enableWebSocket]); // `data` intentionally omitted — accessed via functional updater
 
   // Handle WebSocket errors
   useEffect(() => {
     if (wsError && enableWebSocket) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(`WebSocket error: ${wsError}`);
     }
   }, [wsError, enableWebSocket]);
@@ -162,6 +163,7 @@ const PriceFeedCard: React.FC<PriceFeedCardProps> = ({
   // Initial fetch + fallback polling (only when WebSocket is disabled or disconnected)
   useEffect(() => {
     if (!enableWebSocket || !isConnected) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       load();
       const id = setInterval(() => load(), refreshInterval);
       return () => clearInterval(id);
