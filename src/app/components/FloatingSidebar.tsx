@@ -34,8 +34,16 @@ const FloatingSidebar = memo(() => {
   }, []);
 
   const handlePrefetch = useCallback((href: string) => {
-    if (href === "/contracts") {
-      router.prefetch("/contracts");
+    if (!href) return;
+    if (href === pathname) return;
+
+    try {
+      // Proactively trigger Next.js route prefetch to start asset compilation
+      router.prefetch(href);
+    } catch (err) {
+      // Swallow — prefetch is advisory and may throw in some environments
+      // eslint-disable-next-line no-console
+      console.debug('Prefetch failed for', href, err);
     }
   }, [router]);
 
@@ -72,10 +80,14 @@ const FloatingSidebar = memo(() => {
 
             <Link
               href={href}
-              prefetch={href === "/contracts" ? false : undefined}
+              prefetch={false}
               onClick={() => handleSetActive(href)}
               onFocus={() => handlePrefetch(href)}
-              onMouseEnter={() => handleSetHovered(label)}
+              onMouseEnter={() => {
+                handleSetHovered(label);
+                handlePrefetch(href);
+              }}
+              onPointerEnter={() => handlePrefetch(href)}
               onMouseOver={() => handlePrefetch(href)}
               onMouseLeave={() => handleSetHovered(null)}
               className="relative flex items-center justify-center rounded-xl transition-all duration-200"
