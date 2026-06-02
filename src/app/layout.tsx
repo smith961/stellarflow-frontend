@@ -90,16 +90,17 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <UserProvider>
-            <WalletProvider>
-              <ProgressBarProvider>
-                {children}
-              </ProgressBarProvider>
-            </WalletProvider>
-            <QueryProvider>
-              <ProgressBarProvider>
-                {children}
-              </ProgressBarProvider>
-            </QueryProvider>
+            {/* SocketProvider wraps the full app so any route can consume
+                live WebSocket data without re-mounting on navigation. */}
+            <SocketProvider>
+              <WalletProvider>
+                <QueryProvider>
+                  <ProgressBarProvider>
+                    {children}
+                  </ProgressBarProvider>
+                </QueryProvider>
+              </WalletProvider>
+            </SocketProvider>
           </UserProvider>
         </ThemeProvider>
       </body>
