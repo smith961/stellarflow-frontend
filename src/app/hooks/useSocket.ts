@@ -5,6 +5,7 @@ import { PriceData } from "@/types";
 import { useErrorTimeout } from "./useErrorTimeout";
 import { usePageVisibility } from "./usePageVisibility";
 import { useRAFInterval } from "./useRAFInterval";
+import type { AssetSymbol } from "@/config/assetSymbols";
 
 interface SocketMessage {
   type: "price_update" | "delta_update";
@@ -14,7 +15,7 @@ interface SocketMessage {
 }
 
 export interface UseSocketOptions {
-  assetIds?: string[];
+  assetIds?: AssetSymbol[];
   enableDeltaUpdates?: boolean;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
